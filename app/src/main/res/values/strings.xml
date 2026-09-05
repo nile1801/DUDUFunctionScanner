@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DUDU Function Scanner</string>
+    <string name="accessibility_desc">Observes UI controls and key events for diagnostic correlation with DUDU and FYT system events.</string>
+</resources>

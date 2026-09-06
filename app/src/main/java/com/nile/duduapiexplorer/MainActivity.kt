@@ -5,163 +5,100 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.text.InputType
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
-    private val handler = Handler(Looper.getMainLooper())
-    private lateinit var logText: TextView
-    private lateinit var logScroll: ScrollView
-    private lateinit var packageInput: EditText
-    private lateinit var moduleInput: EditText
-    private lateinit var getStartInput: EditText
-    private lateinit var getEndInput: EditText
-    private var refreshPending = false
-
-    private val storeListener: () -> Unit = {
-        if (!refreshPending) {
-            refreshPending = true
-            handler.postDelayed({
-                refreshPending = false
-                refreshLog()
-            }, 120L)
-        }
-    }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private lateinit var status: TextView
+    private lateinit var output: TextView
+    private lateinit var scroll: ScrollView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(buildUi())
-        DiscoveryStore.addListener(storeListener)
-        DiscoveryStore.add("DUDU API Explorer 1.0.0 opened")
-        DiscoveryStore.add("Security profile: NO permissions, NO Accessibility, NO READ_LOGS, NO QUERY_ALL_PACKAGES, NO root, NO CANBUS cmd")
-        refreshLog()
-        PackageScanner.scanAsync(applicationContext)
-    }
-
-    override fun onDestroy() {
-        DiscoveryStore.removeListener(storeListener)
-        handler.removeCallbacksAndMessages(null)
-        super.onDestroy()
+        DiscoveryStore.add("DUDU API Explorer 1.0.0 started")
+        refresh()
     }
 
     private fun buildUi(): LinearLayout {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
         }
-
         root.addView(TextView(this).apply {
             text = "DUDU API Explorer"
-            textSize = 23f
+            textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
         })
         root.addView(TextView(this).apply {
-            text = "Read-only discovery • không gửi CANBUS cmd • không Accessibility/logcat/root"
+            text = "Read-only scanner: package/component -> vendor classes/methods -> FYT Binder modules. Không Accessibility, không READ_LOGS, không root, không gửi command."
             textSize = 13f
-            setPadding(0, dp(3), 0, dp(8))
+            setPadding(0, dp(4), 0, dp(8))
         })
+        status = TextView(this).apply { text = "Sẵn sàng"; setPadding(0, 0, 0, dp(8)) }
+        root.addView(status)
 
         val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row1.addView(button("QUÉT PACKAGE") { PackageScanner.scanAsync(applicationContext) }, weight())
-        row1.addView(button("PROBE FYT BINDER") { ToolkitProbe.probeModules(applicationContext) }, weight())
+        row1.addView(button("QUÉT PACKAGE") { runPackageScan(false) }, weight())
+        row1.addView(button("QUÉT API / METHOD") { runPackageScan(true) }, weight())
         root.addView(row1)
 
-        root.addView(TextView(this).apply {
-            text = "DEX/API scanner — nhập package đang cài:"
-            textSize = 13f
-            setPadding(0, dp(8), 0, 0)
-        })
-        val dexRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        packageInput = EditText(this).apply {
-            setText("com.syu.canbus")
-            isSingleLine = true
-            textSize = 13f
-        }
-        dexRow.addView(packageInput, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
-        dexRow.addView(button("SCAN DEX/API") {
-            DexApiScanner.scanAsync(applicationContext, packageInput.text.toString())
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        root.addView(dexRow)
+        val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row2.addView(button("PROBE FYT TOOLKIT") { runToolkitProbe() }, weight())
+        row2.addView(button("XUẤT REPORT") { exportReport() }, weight())
+        row2.addView(button("XÓA") { DiscoveryStore.clear(); refresh() }, weight())
+        root.addView(row2)
 
-        root.addView(TextView(this).apply {
-            text = "FYT GET probe — chỉ đọc. Module mặc định 7 = CANBUS; tối đa 256 code/lần:"
-            textSize = 13f
-            setPadding(0, dp(8), 0, 0)
-        })
-        val getRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        moduleInput = numberInput("7")
-        getStartInput = numberInput("0")
-        getEndInput = numberInput("128")
-        getRow.addView(moduleInput, weight())
-        getRow.addView(getStartInput, weight())
-        getRow.addView(getEndInput, weight())
-        getRow.addView(button("SCAN GET") {
-            val module = moduleInput.text.toString().toIntOrNull() ?: 7
-            val start = getStartInput.text.toString().toIntOrNull() ?: 0
-            val end = getEndInput.text.toString().toIntOrNull() ?: start
-            ToolkitProbe.scanGetCodes(applicationContext, module, start, end)
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.5f))
-        root.addView(getRow)
-
-        val row3 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row3.addView(button("XUẤT REPORT TXT") {
-            ReportExporter.exportAsync(applicationContext) { result ->
-                result.onSuccess {
-                    DiscoveryStore.add("Report saved: $it")
-                    Toast.makeText(this, "Đã lưu $it", Toast.LENGTH_LONG).show()
-                }.onFailure {
-                    DiscoveryStore.add("Report export failed: ${it.javaClass.simpleName}: ${it.message}")
-                    Toast.makeText(this, "Xuất report lỗi: ${it.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }, weight())
-        row3.addView(button("XÓA OUTPUT") { DiscoveryStore.clear() }, weight())
-        root.addView(row3)
-
-        root.addView(TextView(this).apply {
-            text = "Gợi ý: chạy QUÉT PACKAGE → PROBE FYT BINDER → SCAN DEX/API lần lượt cho com.syu.canbus, com.syu.ms, com.dudu.autoui. GET probe chỉ dùng khi cần xem API đọc của một module."
-            textSize = 12f
-            setPadding(0, dp(5), 0, dp(5))
-        })
-
-        logScroll = ScrollView(this)
-        logText = TextView(this).apply {
+        scroll = ScrollView(this)
+        output = TextView(this).apply {
             typeface = Typeface.MONOSPACE
-            textSize = 11.5f
+            textSize = 11f
             setTextIsSelectable(true)
-            setPadding(dp(4), dp(6), dp(4), dp(20))
+            setPadding(dp(4), dp(8), dp(4), dp(16))
         }
-        logScroll.addView(logText, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        root.addView(logScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        scroll.addView(output, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         return root
     }
 
-    private fun numberInput(value: String) = EditText(this).apply {
-        setText(value)
-        inputType = InputType.TYPE_CLASS_NUMBER
-        isSingleLine = true
-        textSize = 13f
+    private fun runPackageScan(deep: Boolean) {
+        status.text = if (deep) "Đang quét class/method vendor..." else "Đang quét package/component..."
+        Thread {
+            try { PackageProbe.scan(applicationContext, deep) }
+            catch (t: Throwable) { DiscoveryStore.add("SCAN_FATAL ${t.javaClass.name}: ${t.message}") }
+            mainHandler.post { status.text = "Quét xong"; refresh() }
+        }.start()
     }
 
-    private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
-        text = label
+    private fun runToolkitProbe() {
+        status.text = "Đang bind FYT toolkit (read-only)..."
+        FytToolkitProbe.probe(applicationContext) {
+            mainHandler.post { status.text = "Toolkit probe xong"; refresh() }
+        }
+    }
+
+    private fun exportReport() {
+        val result = ReportExporter.export(applicationContext)
+        result.onSuccess { Toast.makeText(this, "Đã lưu $it", Toast.LENGTH_LONG).show() }
+            .onFailure { Toast.makeText(this, "Lỗi export: ${it.message}", Toast.LENGTH_LONG).show() }
+    }
+
+    private fun refresh() {
+        output.text = DiscoveryStore.snapshot().ifBlank { "Chưa có kết quả." }
+        scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
+
+    private fun button(textValue: String, action: () -> Unit) = Button(this).apply {
+        text = textValue
         isAllCaps = false
         setOnClickListener { action() }
     }
 
     private fun weight() = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-
-    private fun refreshLog() {
-        if (!::logText.isInitialized) return
-        logText.text = DiscoveryStore.snapshot().ifBlank { "Chưa có output" }
-        logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
-    }
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 }

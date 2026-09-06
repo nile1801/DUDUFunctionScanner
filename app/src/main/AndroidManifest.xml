@@ -1,45 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Deliberately NO uses-permission entries. -->
+    <!-- No dangerous permissions by design. Explicit package visibility only. -->
     <queries>
-        <package android:name="com.dudu.autoui" />
-        <package android:name="com.syu.ms" />
-        <package android:name="com.syu.canbus" />
-        <package android:name="com.syu.carui" />
-        <package android:name="com.syu.air" />
-        <package android:name="com.syu.av" />
-        <package android:name="com.syu.bt" />
-        <package android:name="com.syu.calibration" />
-        <package android:name="com.syu.carlink" />
-        <package android:name="com.syu.carmark" />
-        <package android:name="com.syu.carradio" />
-        <package android:name="com.syu.cs" />
-        <package android:name="com.syu.doublecamera" />
-        <package android:name="com.syu.eq" />
-        <package android:name="com.syu.filemanager" />
-        <package android:name="com.syu.fourcamera2" />
-        <package android:name="com.syu.mcukey" />
-        <package android:name="com.syu.music" />
-        <package android:name="com.syu.protocolupdate" />
-        <package android:name="com.syu.ps" />
-        <package android:name="com.syu.radio" />
-        <package android:name="com.syu.rightcamera" />
-        <package android:name="com.syu.screensaver" />
-        <package android:name="com.syu.dvr" />
-        <package android:name="com.syu.tpms" />
-        <package android:name="com.syu.obd" />
-        <package android:name="com.syu.steer" />
         <intent>
             <action android:name="com.syu.ms.toolkit" />
         </intent>
+        <package android:name="com.syu.ms" />
+        <package android:name="com.syu.canbus" />
+        <package android:name="com.syu.air" />
+        <package android:name="com.syu.carui" />
+        <package android:name="com.syu.autosettings" />
+        <package android:name="com.syu.mcukey" />
+        <package android:name="com.syu.protocolupdate" />
+        <package android:name="com.syu.cs" />
+        <package android:name="com.syu.av" />
+        <package android:name="com.syu.bt" />
+        <package android:name="com.syu.carradio" />
+        <package android:name="com.syu.carlink" />
+        <package android:name="com.syu.fourcamera2" />
+        <package android:name="com.syu.rightcamera" />
+        <package android:name="com.syu.eq" />
+        <package android:name="com.syu.music" />
+        <package android:name="com.dudu.autoui" />
+        <package android:name="com.dudu.voice" />
+        <package android:name="com.dudu.settings" />
     </queries>
 
     <application
         android:allowBackup="false"
         android:label="DUDU API Explorer"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
             android:exported="true">

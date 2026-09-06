@@ -1,57 +1,35 @@
 # DUDU API Explorer
 
-A clean-room, read-only discovery app for DUDU/FYT/SYU head units.
+A read-only Android diagnostic app for DUDU/FYT head units.
 
 ## Goal
+Discover usable DUDU/FYT integration surfaces without controlling the vehicle:
+- explicit DUDU/SYU package inventory
+- exported activities/services/receivers/providers
+- readable vendor DEX class names
+- public/protected methods and fields from candidate API/service/control classes
+- FYT `com.syu.ms.toolkit` Binder connectivity
+- read-only enumeration of FYT remote module Binder descriptors for module IDs 0..20
 
-Discover the APIs, components, Binder interfaces, FYT modules and DEX method/action strings that actually exist on the installed DUDU firmware. The app does not send CANBUS commands.
+## Safety / Play Protect-oriented design
+This rewrite intentionally has:
+- no Accessibility Service
+- no `READ_LOGS`
+- no root commands
+- no `QUERY_ALL_PACKAGES`
+- no storage permission
+- no network permission
+- no background service
+- no CANBUS `cmd()` calls
 
-## Play Protect / permissions
+The app only uses explicit `<queries>` package visibility, PackageManager, DEX reflection, Binder metadata and MediaStore report export.
 
-This rewrite intentionally declares **no Android permissions**. In particular it does not request:
+## Public reverse-engineering references used for architecture
+- AxesOfEvil/FYTCanbusMonitor: FYT toolkit binding, module mapping, `IRemoteToolkit.getRemoteModule()`
+- PimpinPumpkin/FytRadio / FytBt: normal third-party FYT/SYU IPC architecture
+- vasyl91/FYT-Launcher-Mod: FYT/SYU package and CANBUS implementation naming
+- Vasilich/FYT_CustomService: FYT Android service/device architecture reference
+- rsteckler/Climate100: FYT CANBUS control architecture reference (control calls are deliberately NOT included here)
 
-- `android.permission.READ_LOGS`
-- `android.permission.QUERY_ALL_PACKAGES`
-- Accessibility Service
-- root
-- storage permission
-
-Package visibility is limited to an explicit `<queries>` allow-list of known DUDU/SYU packages.
-
-## Discovery modes
-
-1. **Package + Component Scan**
-   - version / source path / signing certificate
-   - exported activities, services, receivers and providers
-   - component permissions and process names
-   - resolver checks for sourced FYT actions
-
-2. **FYT Toolkit Binder Probe**
-   - binds read-only to `com.syu.ms/app.ToolkitService`
-   - action: `com.syu.ms.toolkit`
-   - inspects Binder descriptor
-   - calls only `IRemoteToolkit.getRemoteModule(int)` (transaction 1) to enumerate module IDs 0..20
-   - does **not** implement or call `IRemoteModule.cmd`
-
-3. **FYT GET Probe (read-only)**
-   - user selects one module and a small GET-code range
-   - invokes only `IRemoteModule.get(...)` (transaction 2)
-   - reports returned int/float/string arrays
-
-4. **DEX API Scanner**
-   - opens the installed APK in place via `ApplicationInfo.sourceDir`
-   - reads `classes*.dex`
-   - extracts vendor class/method signatures and interesting action/API strings
-   - does not copy or modify vendor APKs
-
-5. **TXT Report Export**
-   - Android 10+: `Downloads/DUDUApiExplorer/`
-   - no storage permission required
-
-## Public-source evidence used for the scanner design
-
-- `rsteckler/Climate100`: normal Android app binds to `com.syu.ms.toolkit`; its FYT IPC sources show `IRemoteToolkit.getRemoteModule` transaction 1 and `IRemoteModule.get` transaction 2.
-- `vasyl91/FYT-Launcher-Mod`: reverse-engineered FYT/SYU code with `IRemoteToolkit`, `IRemoteModule`, CANBUS profiles and DUDU/FYT service architecture.
-- `Vasilich/FYT_CustomService`: documents FYT ACC broadcasts `com.fyt.boot.ACCON` / `com.fyt.boot.ACCOFF` on modern FYT units.
-
-The app intentionally treats public profiles as hints only. The installed DUDU firmware is the source of truth.
+## Output
+Reports are written to `Download/DUDUApiExplorer/` on Android 10+.

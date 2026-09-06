@@ -172,7 +172,10 @@ object ToolkitProbe {
         }
     }
 
-    private fun safeDescriptor(binder: IBinder): String = runCatching { binder.interfaceDescriptor }.getOrElse { "<error:${it.javaClass.simpleName}>" }
+    private fun safeDescriptor(binder: IBinder): String =
+        runCatching { binder.interfaceDescriptor ?: "<null>" }
+            .getOrElse { "<error:${it.javaClass.simpleName}>" }
+
     private fun shortError(t: Throwable): String = "${t.javaClass.simpleName}: ${t.message.orEmpty().replace('\n', ' ')}"
 
     private fun fmt(v: IntArray?): String = v?.take(32)?.joinToString(prefix = "[", postfix = if ((v.size) > 32) ", ...]" else "]") ?: "null"

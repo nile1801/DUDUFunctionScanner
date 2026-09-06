@@ -1,44 +1,57 @@
-# DUDU Function Scanner
+# DUDU API Explorer
 
-Diagnostic Android app for DUDUOS/FYT head units (tested design target: DUDUOS 3.7 / UIS7870 family).
+A clean-room, read-only discovery app for DUDU/FYT/SYU head units.
 
-## What it records
+## Goal
 
-- Accessibility click / long-click / selected events from other apps: package, class, text, content description, resource/view id and screen bounds.
-- Hardware Android KeyEvent when the Accessibility service receives it (useful for steering-wheel/media keys that are mapped to Android key codes).
-- FYT `com.syu.ms.toolkit` IPC updates from MAIN, BT and CANBUS modules, using the same read-only callback protocol already proven in `nile1801/FYTCanbusMonitor`.
-- Nearby logcat lines when the unit grants `READ_LOGS` (or optional root mode is enabled), to look for Binder/service/cmd clues around the exact click timestamp.
-- Exported DUDU/FYT/SYU activities, services, receivers and providers visible through Android PackageManager.
-- Read-only probe of `content://com.syu.ms.provider/bt` when exported by the firmware.
+Discover the APIs, components, Binder interfaces, FYT modules and DEX method/action strings that actually exist on the installed DUDU firmware. The app does not send CANBUS commands.
 
-## Important limitation
+## Play Protect / permissions
 
-Android Accessibility can identify **which UI node was clicked**, but Android does **not** expose the Java/Kotlin method invoked inside another process. Therefore the app labels an exact function only when there is observable evidence (for example a logcat `cmd(...)`, service/Binder message, or a correlated FYT update). Otherwise it reports `CHƯA XÁC ĐỊNH` and shows evidence/candidates instead of inventing a function name.
+This rewrite intentionally declares **no Android permissions**. In particular it does not request:
 
-For true method-level tracing of another app, the head unit would need a deeper instrumentation layer such as root + Frida/Xposed/JVMTI-compatible hooking. This first scanner build intentionally stays observational and does not inject CAN commands.
+- `android.permission.READ_LOGS`
+- `android.permission.QUERY_ALL_PACKAGES`
+- Accessibility Service
+- root
+- storage permission
 
-## DUDU/FYT evidence used
+Package visibility is limited to an explicit `<queries>` allow-list of known DUDU/SYU packages.
 
-- DUDU's official CANBUS troubleshooting guide asks users to enable Protocol Print, press the affected button repeatedly and correlate the changing CANBUS data: https://forum.dudu-auto.com/d/846-how-to-give-correct-feedback-on-canbus-errors
-- DUDUOS 3.7 forum debugging of climate-control issues also uses A/C operations plus CANBUS logs: https://forum.dudu-auto.com/d/2750-ac-app-temps-being-incorrectly-converted-37-beta
-- Reverse engineering posted on the DUDU forum shows CarLink binding to `com.syu.ms` via action `com.syu.ms.toolkit`: https://forum.dudu-auto.com/d/2470-carlink-integration-with-dudu-music-widget/19
-- Public FYT work demonstrates the same `com.syu.ms.toolkit` / `IRemoteModule` Binder protocol: https://github.com/PimpinPumpkin/FytRadio
-- The MAIN/CANBUS module ids and subscription ranges are based on the existing FYTCanbusMonitor project that already works on the target unit.
+## Discovery modes
 
-## Setup on the head unit
+1. **Package + Component Scan**
+   - version / source path / signing certificate
+   - exported activities, services, receivers and providers
+   - component permissions and process names
+   - resolver checks for sourced FYT actions
 
-1. Install the APK.
-2. Open **Cài Accessibility** and enable **DUDU Function Scanner**.
-3. Return to the scanner. FYT MAIN/BT/CANBUS monitoring starts automatically while the Accessibility service is enabled.
-4. For richer logcat correlation (optional), from ADB run:
+2. **FYT Toolkit Binder Probe**
+   - binds read-only to `com.syu.ms/app.ToolkitService`
+   - action: `com.syu.ms.toolkit`
+   - inspects Binder descriptor
+   - calls only `IRemoteToolkit.getRemoteModule(int)` (transaction 1) to enumerate module IDs 0..20
+   - does **not** implement or call `IRemoteModule.cmd`
 
-```bash
-adb shell pm grant com.nile.dudufunctionscanner android.permission.READ_LOGS
-```
+3. **FYT GET Probe (read-only)**
+   - user selects one module and a small GET-code range
+   - invokes only `IRemoteModule.get(...)` (transaction 2)
+   - reports returned int/float/string arrays
 
-5. Operate DUDU controls one at a time. The scanner groups UI/key input and FYT/logcat evidence by timestamp.
-6. Use **Xuất TXT** and share the file for analysis.
+4. **DEX API Scanner**
+   - opens the installed APK in place via `ApplicationInfo.sourceDir`
+   - reads `classes*.dex`
+   - extracts vendor class/method signatures and interesting action/API strings
+   - does not copy or modify vendor APKs
 
-## Safety
+5. **TXT Report Export**
+   - Android 10+: `Downloads/DUDUApiExplorer/`
+   - no storage permission required
 
-The scanner only observes/subscribes to FYT module updates. It does not call `cmd(...)`, transmit CAN frames, or change vehicle state.
+## Public-source evidence used for the scanner design
+
+- `rsteckler/Climate100`: normal Android app binds to `com.syu.ms.toolkit`; its FYT IPC sources show `IRemoteToolkit.getRemoteModule` transaction 1 and `IRemoteModule.get` transaction 2.
+- `vasyl91/FYT-Launcher-Mod`: reverse-engineered FYT/SYU code with `IRemoteToolkit`, `IRemoteModule`, CANBUS profiles and DUDU/FYT service architecture.
+- `Vasilich/FYT_CustomService`: documents FYT ACC broadcasts `com.fyt.boot.ACCON` / `com.fyt.boot.ACCOFF` on modern FYT units.
+
+The app intentionally treats public profiles as hints only. The installed DUDU firmware is the source of truth.

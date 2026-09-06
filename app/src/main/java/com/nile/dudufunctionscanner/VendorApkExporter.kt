@@ -15,7 +15,7 @@ import java.util.Date
 import java.util.Locale
 
 object VendorApkExporter {
-    private const val RELATIVE_DIR = "${Environment.DIRECTORY_DOWNLOADS}/DUDUFunctionScanner/vendor-apks"
+    private const val RELATIVE_DIR = "Download/DUDUFunctionScanner/vendor-apks"
 
     private val priorityPackages = listOf(
         "com.syu.canbus",

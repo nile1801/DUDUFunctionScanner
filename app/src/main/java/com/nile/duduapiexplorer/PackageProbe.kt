@@ -28,17 +28,20 @@ object PackageProbe {
         return try {
             if (Build.VERSION.SDK_INT >= 33) {
                 pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(flags.toLong()))
-            } else pm.getPackageInfo(pkg, flags)
+            } else {
+                pm.getPackageInfo(pkg, flags)
+            }
         } catch (_: Throwable) {
             DiscoveryStore.add("NOT_INSTALLED $pkg")
             null
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun dumpPackage(info: PackageInfo, pm: PackageManager) {
         val app = info.applicationInfo ?: return
         val label = runCatching { pm.getApplicationLabel(app).toString() }.getOrDefault("")
-        val versionCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+        val versionCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
         DiscoveryStore.add("")
         DiscoveryStore.add("PACKAGE ${info.packageName}")
         DiscoveryStore.add("  label=$label version=${info.versionName}($versionCode)")
@@ -57,6 +60,7 @@ object PackageProbe {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun scanCode(context: Context, info: PackageInfo) {
         val app = info.applicationInfo ?: return
         val source = app.sourceDir ?: return
@@ -67,16 +71,19 @@ object PackageProbe {
 
         val candidates = mutableListOf<String>()
         try {
-            DexFile(source).use { dex ->
-                val e = dex.entries()
-                while (e.hasMoreElements() && candidates.size < 220) {
-                    val name = e.nextElement()
+            val dex = DexFile(source)
+            try {
+                val entries = dex.entries()
+                while (entries.hasMoreElements() && candidates.size < 220) {
+                    val name = entries.nextElement()
                     val lower = name.lowercase()
                     if ((name.startsWith("com.syu.") || name.startsWith("com.dudu.")) &&
-                        KnownTargets.classKeywords.any { lower.contains(it) }) {
+                        KnownTargets.classKeywords.any { keyword -> lower.contains(keyword) }) {
                         candidates += name
                     }
                 }
+            } finally {
+                runCatching { dex.close() }
             }
         } catch (t: Throwable) {
             DiscoveryStore.add("  CODE_SCAN dex_error=${t.javaClass.simpleName}:${t.message}")
@@ -98,10 +105,12 @@ object PackageProbe {
                     .take(12)
                 if (methods.isNotEmpty() || fields.isNotEmpty()) {
                     DiscoveryStore.add("  CLASS $className")
-                    fields.forEach { f -> DiscoveryStore.add("    FIELD ${Modifier.toString(f.modifiers)} ${f.type.simpleName} ${f.name}") }
-                    methods.forEach { m ->
-                        val args = m.parameterTypes.joinToString(",") { it.simpleName }
-                        DiscoveryStore.add("    METHOD ${Modifier.toString(m.modifiers)} ${m.returnType.simpleName} ${m.name}($args)")
+                    fields.forEach { field ->
+                        DiscoveryStore.add("    FIELD ${Modifier.toString(field.modifiers)} ${field.type.simpleName} ${field.name}")
+                    }
+                    methods.forEach { method ->
+                        val args = method.parameterTypes.joinToString(",") { it.simpleName }
+                        DiscoveryStore.add("    METHOD ${Modifier.toString(method.modifiers)} ${method.returnType.simpleName} ${method.name}($args)")
                         methodBudget--
                     }
                 }

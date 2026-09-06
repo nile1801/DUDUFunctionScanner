@@ -34,6 +34,8 @@ class MainActivity : Activity() {
     private lateinit var statusText: TextView
     private lateinit var logText: TextView
     private lateinit var logScroll: ScrollView
+    private lateinit var vendorExportButton: Button
+    private lateinit var vendorExportStatus: TextView
     private var refreshPending = false
 
     private val storeListener: () -> Unit = {
@@ -44,7 +46,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(buildUi())
         ScanStore.addListener(storeListener)
-        ScanStore.add("APP: DUDU Function Scanner 0.1.0 opened")
+        ScanStore.add("APP: DUDU Function Scanner 0.2.0 opened")
         refreshStatus()
         refreshLog()
     }
@@ -99,6 +101,19 @@ class MainActivity : Activity() {
         row2.addView(button("XUAT TXT") { exportLog() }, weightParams())
         row2.addView(button("COPY LENH ADB") { copyAdbCommand() }, weightParams())
         root.addView(row2)
+
+        vendorExportButton = button("XUAT DUDU / FYT VENDOR APK") {
+            exportVendorApks()
+        }
+        root.addView(vendorExportButton)
+
+        vendorExportStatus = TextView(this).apply {
+            text = "Export APK: chua chay. File se nam trong Downloads/DUDUFunctionScanner/vendor-apks/"
+            textSize = 12f
+            setTextIsSelectable(true)
+            setPadding(0, dp(2), 0, dp(6))
+        }
+        root.addView(vendorExportStatus)
 
         val prefs = getSharedPreferences("scanner", Context.MODE_PRIVATE)
         root.addView(CheckBox(this).apply {
@@ -183,6 +198,32 @@ class MainActivity : Activity() {
         val cm = getSystemService(ClipboardManager::class.java)
         cm.setPrimaryClip(ClipData.newPlainText("DUDU scanner ADB", command))
         Toast.makeText(this, "Da copy lenh ADB", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun exportVendorApks() {
+        if (!vendorExportButton.isEnabled) return
+        vendorExportButton.isEnabled = false
+        vendorExportButton.text = "DANG XUAT VENDOR APK..."
+        vendorExportStatus.text = "Dang tim package com.syu.* / com.dudu.* va copy APK..."
+        ScanStore.add("VENDOR_EXPORT: START")
+
+        VendorApkExporter.exportAsync(applicationContext) { result ->
+            vendorExportButton.isEnabled = true
+            vendorExportButton.text = "XUAT DUDU / FYT VENDOR APK"
+
+            result.onSuccess { summary ->
+                val text = summary.displayText()
+                vendorExportStatus.text = text
+                ScanStore.add("VENDOR_EXPORT: OK found=${summary.foundPackages} copied=${summary.copiedApks} failed=${summary.failedApks}")
+                ScanStore.add("VENDOR_EXPORT: report=${summary.reportName}")
+                Toast.makeText(this, "Xuat vendor APK xong", Toast.LENGTH_LONG).show()
+            }.onFailure { error ->
+                val text = "Export vendor APK loi: ${error.javaClass.simpleName}: ${error.message.orEmpty()}"
+                vendorExportStatus.text = text
+                ScanStore.add("VENDOR_EXPORT: FAILED $text")
+                Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun exportLog() {

@@ -33,3 +33,5 @@ The app only uses explicit `<queries>` package visibility, PackageManager, DEX r
 
 ## Output
 Reports are written to `Download/DUDUApiExplorer/` on Android 10+.
+
+Build target: Android 8+ (minSdk 26), targetSdk 35.
